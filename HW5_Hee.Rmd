@@ -1,0 +1,114 @@
+---
+title: "< STAT-5361 > HW#5-Exercises 4.8.1"
+author: "Hee-Seung, Kim"
+date: "Oct 11, 2018"
+output: pdf_document
+fontsize: 11pt
+documentclass: article
+knit: "bookdown::render_book('HW5_Hee.Rmd','bookdown::pdf_document2')"
+papersize: letter
+biblio-style: asa 
+---
+
+\newpage
+# Exercises 4.8.1
+
+## 1.(a)
+$$\begin{aligned}
+Q(\Psi|\Psi^{(k)})&=E[\ln L(\Psi|x_i, y_i, z)|x_i,y_i,\Psi^{(k)}]\\
+&=\sum_{i=1}^n\sum_{j=1}^m p_{ij}^{(k+1)}{(\log\pi_j+\log\phi(y_i-x_i^T\beta_j;0,\sigma^2))}\\
+\end{aligned}$$
+
+ $$\sum_{j=1}^m\pi_j = 1$$
+$$L(\pi_1,...,\pi_m,\lambda)=Q(\Psi|\Psi(k))-\lambda(\sum_{j=1}^{m}\pi_j-1)=0$$
+$$L_{\pi_j}^{'}=0L_{\lambda}^{'}=0, (j=1,2,...,m)$$
+$$\sum_{i=1}^{n}p_{ij}^{(k+1)}\frac{1}{\pi_{j}}-\lambda=0, (j=1,2,...,m)$$
+$$\pi_{j}=\frac{\sum_{i=1}^{n}p_{ij}^{(k+1)}}{\lambda}$$
+$$\sum_{j=1}^{m}\pi_{j}=\frac{\sum_{i=1}^n\sum_{j=1}^m p_{ij}^{(k+1)}}{\lambda}=\frac{n}{\lambda}=1$$
+$$\therefore \lambda = n$$
+$$\pi_{j}=\frac{\sum_{i=1}^n p_{ij}^{(k+1)}}{n}$$
+
+## 1.(b)
+$$\begin{aligned}
+Q(\Psi|\Psi^{(k)})&=\sum_{i=1}^n\sum_{j=1}^{m}p_{ij}^{(k+1)}{(\log\pi_j+\log(\frac{1}{\sqrt{2\pi}\sigma}exp[-\frac{(y_i-x_i^T\beta_j)^2}{2\sigma^2}]))}\\
+  &=\sum_{i=1}^{n}\sum_{j=1}^m p_{ij}^{(k+1)}{(\log\pi_j+\log(\frac{1}{\sqrt{2\pi}\sigma})+[-\frac{(y_i-x_i^T\beta_j)^2}{2\sigma^2}])}
+\end{aligned}$$
+
+It's the sum of m quadratic forms, where each form includes a single $\beta_{j}$ for every j.
+
+$$\begin{aligned}
+\sum_{i=1}^n\sum_{j=1}^m p_{ij}^{(k+1)}[-\frac{(y_i-x_i^T\beta_j)^2}{2\sigma^2}]&= -\sum_{i=1}^{n}p_{ij}^{(k+1)}[\frac{(y_i-x_i^T\beta_j)^2}{2\sigma^2}]\\
+ &= \sum_{i=1}^{n}p_{ij}^{(k+1)}[x_i^T(\frac{y_i}{x_i^T}-\beta_j)]^2\\
+ &= \sum_{i=1}^{n}p_{ij}^{(k+1)}x_{i}x_i^T(\frac{y_i}{x_i^T}-\beta_j)^2\\
+\end{aligned}$$
+$$\beta_j=\sum_{i=1}^{n}p_{ij}x_{i}x_i^{T}\frac{y_i}{x_i^T}=\sum_{i=1}^{n}p_{ij}x_{i}y_i^{T}$$
+
+## 1.(c)
+$$\begin{aligned}
+\sigma^{2(k+1)} &=\frac{\sum_{i=1}^{n}\sum_{j=1}^{m}p_{ij}^{(k+1)}{(y_i-x_i^T\beta_j^{(k+1)})^2}}{\sum_{i=1}^{n}\sum_{j=1}^{m}p_{ij}^{(k+1)}} \\
+&= \frac{\sum_{i=1}^{n}\sum_{j=1}^{m}p_{ij}^{(k+1)}{(y_i-x_i^T\beta_j^{(k+1)})^2}}{n}
+\end{aligned}$$
+
+## 2.
+```{r}
+regmix_em = function(y, xmat, initial.pi , initial.beta, initial.sigma,
+                     control = list(maxit = 500, tol = 1e-5))
+{
+  updated.pi <- curr.pi <- initial.pi
+  updated.beta<- curr.beta <- initial.beta 
+  updated.sigma <- curr.sigma <- initial.sigma
+  n = length(y)
+  m = length(initial.pi)
+  xmat = as.matrix(xmat)
+  pb = matrix(0,length(y),length(initial.pi))
+  for(k in 1:control$maxit)
+  {   
+    for(i in 1:m)
+      pb[,i] = curr.pi[i] * dnorm(y - xmat %*% curr.beta[,i],0,curr.sigma)
+    updated.p =  pb/rowSums(pb)
+    updated.pi = colMeans(updated.p)
+    
+    for(j in 1:m)
+    updated.beta[,j] = solve(t(xmat * updated.p[,j]) %*% xmat ) %*% 
+      t(xmat * updated.p[,j] ) %*% y
+    updated.sigma = sqrt(sum(updated.p[,1] * (y - xmat %*% updated.beta[,1])^2 +
+                       updated.p[,2] * (y - xmat %*% updated.beta[,2])^2 +
+                       updated.p[,3] * (y - xmat %*% updated.beta[,3])^2)/n)
+    
+    if( sum(abs(curr.pi - updated.pi)) + sum(abs(curr.beta - updated.beta)) + 
+        sum(abs(curr.sigma - updated.sigma)) < control$tol ) break
+    curr.pi = updated.pi 
+    curr.beta = updated.beta 
+    curr.sigma = updated.sigma
+  }
+  return(list(pi = curr.pi, beta = curr.beta, sigma = curr.sigma, iter = k))
+}    
+```
+
+## 3
+```{r}
+regmix_sim <- function(n, pi, beta, sigma) {
+  K <- ncol(beta)
+  p <- NROW(beta)
+  xmat <- matrix(rnorm(n * p), n, p) # normal covaraites
+  error <- matrix(rnorm(n * K, sd = sigma), n, K)
+  ymat <- xmat %*% beta + error # n by K matrix
+  ind <- t(rmultinom(n, size = 1, prob = pi))
+  y <- rowSums(ymat * ind)
+  data.frame(y, xmat)
+}
+n <- 400
+pi <- c(.3, .4, .3)
+bet <- matrix(c( 1,  1,  1, 
+                 -1, -1, -1), 2, 3)
+sig <- 1
+set.seed(1205)
+dat <- regmix_sim(n, pi, bet, sig)
+regmix_em(y = dat[,1], xmat = dat[,-1], initial.pi = pi / pi / length(pi), 
+          initial.beta = bet * 0, initial.sigma = sig/sig, 
+          control = list(maxit = 500, tol = 1e-10))
+regmix_em(y = dat[,1], xmat = dat[,-1], initial.pi = pi / pi / length(pi), 
+          initial.beta = matrix(-2:3,2,3), initial.sigma = sig/sig, 
+          control = list(maxit = 500, tol = 1e-10))
+```
+
